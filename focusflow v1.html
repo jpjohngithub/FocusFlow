@@ -1,0 +1,1131 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusFlow - Produtividade e Finanças</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+        }
+        .task-item:hover .task-actions {
+            opacity: 1;
+        }
+        .habit-tracker .habit-progress {
+            transition: width 0.3s ease;
+        }
+        .note {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        .note:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .pomodoro-display {
+            font-family: 'Courier New', monospace;
+        }
+        .dark {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .dark .dark-bg {
+            background-color: #2d3748;
+        }
+        .dark .dark-border {
+            border-color: #4a5568;
+        }
+        .dark .dark-text {
+            color: #e2e8f0;
+        }
+        .dark .dark-input {
+            background-color: #2d3748;
+            border-color: #4a5568;
+            color: #e2e8f0;
+        }
+        .dark .dark-card {
+            background-color: #2d3748;
+            border-color: #4a5568;
+        }
+        .dark .dark-hover:hover {
+            background-color: #4a5568;
+        }
+        .transaction-income {
+            border-left: 4px solid #10b981;
+        }
+        .transaction-expense {
+            border-left: 4px solid #ef4444;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-button.active {
+            color: #3b82f6;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .dark .tab-button.active {
+            color: #60a5fa;
+            border-bottom-color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen transition-colors duration-300">
+    <div class="gradient-bg text-white py-6 shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-3xl font-bold flex items-center">
+                        <i class="fas fa-rocket mr-2"></i> FocusFlow
+                    </h1>
+                    <button id="dark-mode-toggle" class="p-2 rounded-full bg-white bg-opacity-10 hover:bg-opacity-20">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="current-date" class="text-lg"></span>
+                    <span id="current-time" class="text-lg font-mono"></span>
+                </div>
+            </div>
+            <p class="mt-2 opacity-90">Seu hub completo para produtividade, finanças e organização</p>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-gray-200 dark:border-gray-600 mb-8 overflow-x-auto" role="tablist">
+            <button data-tab="tasks" class="tab-button active py-2 px-4 font-medium whitespace-nowrap" role="tab" aria-selected="true">
+                <i class="fas fa-tasks mr-2"></i>Tarefas
+            </button>
+            <button data-tab="pomodoro" class="tab-button py-2 px-4 font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" role="tab" aria-selected="false">
+                <i class="fas fa-clock mr-2"></i>Pomodoro
+            </button>
+            <button data-tab="habits" class="tab-button py-2 px-4 font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" role="tab" aria-selected="false">
+                <i class="fas fa-calendar-check mr-2"></i>Hábitos
+            </button>
+            <button data-tab="finance" class="tab-button py-2 px-4 font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" role="tab" aria-selected="false">
+                <i class="fas fa-wallet mr-2"></i>Finanças
+            </button>
+            <button data-tab="notes" class="tab-button py-2 px-4 font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" role="tab" aria-selected="false">
+                <i class="fas fa-sticky-note mr-2"></i>Notas
+            </button>
+        </div>
+
+        <!-- Tasks Tab Content -->
+        <div id="tasks-content" class="tab-content active" role="tabpanel">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 dark:border dark:border-gray-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white">
+                        <i class="fas fa-tasks mr-2 text-blue-500"></i>Minhas Tarefas
+                    </h2>
+                    <button id="add-task-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+                        <i class="fas fa-plus mr-2"></i>Nova Tarefa
+                    </button>
+                </div>
+
+                <!-- Task Input Form -->
+                <div id="task-form" class="hidden mb-6">
+                    <div class="flex">
+                        <input type="text" id="task-input" placeholder="O que precisa ser feito?" class="flex-grow px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        <button id="save-task-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-lg">
+                            Adicionar
+                        </button>
+                    </div>
+                    <div class="mt-2 flex items-center">
+                        <label class="inline-flex items-center dark:text-gray-300">
+                            <input type="checkbox" id="important-checkbox" class="form-checkbox h-5 w-5 text-blue-600">
+                            <span class="ml-2">Importante</span>
+                        </label>
+                        <input type="date" id="task-due-date" class="ml-4 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700">
+                    </div>
+                </div>
+
+                <!-- Task Filters -->
+                <div class="flex space-x-4 mb-6 overflow-x-auto pb-2">
+                    <button data-filter="all" class="filter-btn active px-4 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full whitespace-nowrap">Todas</button>
+                    <button data-filter="active" class="filter-btn px-4 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full whitespace-nowrap">Pendentes</button>
+                    <button data-filter="completed" class="filter-btn px-4 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full whitespace-nowrap">Completas</button>
+                    <button data-filter="important" class="filter-btn px-4 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full whitespace-nowrap">Importantes</button>
+                </div>
+
+                <!-- Task List -->
+                <div id="task-list" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Pomodoro Tab Content -->
+        <div id="pomodoro-content" class="tab-content hidden" role="tabpanel">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 dark:border dark:border-gray-700">
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-white mb-6">
+                    <i class="fas fa-clock mr-2 text-orange-500"></i>Técnica Pomodoro
+                </h2>
+                <div class="flex flex-col items-center">
+                    <div class="pomodoro-display text-6xl font-bold mb-8 text-gray-800 dark:text-white" id="pomodoro-timer">25:00</div>
+                    <div class="flex space-x-4 mb-8">
+                        <button id="pomodoro-start" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-medium">
+                            <i class="fas fa-play mr-2"></i>Iniciar
+                        </button>
+                        <button id="pomodoro-pause" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-lg text-lg font-medium hidden">
+                            <i class="fas fa-pause mr-2"></i>Pausar
+                        </button>
+                        <button id="pomodoro-reset" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-medium">
+                            <i class="fas fa-redo mr-2"></i>Resetar
+                        </button>
+                    </div>
+                    <div class="w-full max-w-md">
+                        <div class="flex justify-between mb-2 dark:text-gray-300">
+                            <span>Sessão de trabalho</span>
+                            <span class="font-medium">25 minutos</span>
+                        </div>
+                        <div class="flex justify-between mb-2 dark:text-gray-300">
+                            <span>Pausa curta</span>
+                            <span class="font-medium">5 minutos</span>
+                        </div>
+                        <div class="flex justify-between dark:text-gray-300">
+                            <span>Pausa longa</span>
+                            <span class="font-medium">15 minutos</span>
+                        </div>
+                    </div>
+                    <div class="mt-8 w-full max-w-md">
+                        <h3 class="text-lg font-medium text-gray-800 dark:text-white mb-4">Configurações</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trabalho (min)</label>
+                                <input type="number" id="work-duration" value="25" min="1" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pausa curta (min)</label>
+                                <input type="number" id="short-break" value="5" min="1" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pausa longa (min)</label>
+                                <input type="number" id="long-break" value="15" min="1" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white">
+                            </div>
+                        </div>
+                        <button id="save-settings" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md">
+                            Salvar Configurações
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Habits Tab Content -->
+        <div id="habits-content" class="tab-content hidden" role="tabpanel">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 dark:border dark:border-gray-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white">
+                        <i class="fas fa-calendar-check mr-2 text-green-500"></i>Rastreador de Hábitos
+                    </h2>
+                    <button id="add-habit-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center">
+                        <i class="fas fa-plus mr-2"></i>Novo Hábito
+                    </button>
+                </div>
+                <div id="habit-form" class="hidden mb-6">
+                    <div class="flex">
+                        <input type="text" id="habit-input" placeholder="Qual hábito você quer desenvolver?" class="flex-grow px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white">
+                        <button id="save-habit-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-r-lg">
+                            Adicionar
+                        </button>
+                    </div>
+                    <div class="mt-4 grid grid-cols-7 gap-2">
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="0" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Dom</span>
+                        </label>
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="1" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Seg</span>
+                        </label>
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="2" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Ter</span>
+                        </label>
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="3" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Qua</span>
+                        </label>
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="4" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Qui</span>
+                        </label>
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="5" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Sex</span>
+                        </label>
+                        <label class="flex items-center dark:text-gray-300">
+                            <input type="checkbox" name="habit-days" value="6" class="form-checkbox h-5 w-5 text-green-600">
+                            <span class="ml-2">Sáb</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                    <h3 class="text-lg font-medium text-blue-800 dark:text-blue-200 mb-2">Seu progresso esta semana</h3>
+                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-4">
+                        <div id="weekly-progress" class="bg-blue-500 h-4 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-2 flex justify-between text-sm text-blue-800 dark:text-blue-200">
+                        <span>0%</span>
+                        <span id="progress-percentage">0%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+                <div id="habit-list" class="space-y-4"></div>
+            </div>
+        </div>
+
+        <!-- Finance Tab Content -->
+        <div id="finance-content" class="tab-content hidden" role="tabpanel">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 dark:border dark:border-gray-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white">
+                        <i class="fas fa-wallet mr-2 text-purple-500"></i>Minhas Finanças
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button id="add-income-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center">
+                            <i class="fas fa-plus-circle mr-2"></i>Receita
+                        </button>
+                        <button id="add-expense-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center">
+                            <i class="fas fa-minus-circle mr-2"></i>Despesa
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-green-50 dark:bg-green-900 rounded-lg p-4 shadow">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-green-800 dark:text-green-200">Receitas</h3>
+                            <i class="fas fa-arrow-up text-green-500"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-green-600 dark:text-green-300 mt-2" id="total-income">R$ 0,00</div>
+                        <div class="text-sm text-green-600 dark:text-green-300">Este mês</div>
+                    </div>
+                    <div class="bg-red-50 dark:bg-red-900 rounded-lg p-4 shadow">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-red-800 dark:text-red-200">Despesas</h3>
+                            <i class="fas fa-arrow-down text-red-500"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-red-600 dark:text-red-300 mt-2" id="total-expense">R$ 0,00</div>
+                        <div class="text-sm text-red-600 dark:text-red-300">Este mês</div>
+                    </div>
+                    <div class="bg-blue-50 dark:bg-blue-900 rounded-lg p-4 shadow">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-blue-800 dark:text-blue-200">Saldo</h3>
+                            <i class="fas fa-dollar-sign text-blue-500"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-blue-600 dark:text-blue-300 mt-2" id="total-balance">R$ 0,00</div>
+                        <div class="text-sm text-blue-600 dark:text-blue-300">Disponível</div>
+                    </div>
+                </div>
+                <div id="transaction-form" class="hidden mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
+                            <select id="transaction-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                <option value="income">Receita</option>
+                                <option value="expense">Despesa</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+                            <select id="transaction-category" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor</label>
+                            <input type="number" id="transaction-amount" placeholder="0,00" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
+                            <input type="date" id="transaction-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição</label>
+                        <input type="text" id="transaction-description" placeholder="Descrição da transação" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button id="cancel-transaction-btn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Cancelar
+                        </button>
+                        <button id="save-transaction-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg">
+                            Salvar
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <select id="finance-month" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"></select>
+                    <select id="finance-year" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"></select>
+                    <select id="finance-type-filter" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                        <option value="all">Todos os tipos</option>
+                        <option value="income">Receitas</option>
+                        <option value="expense">Despesas</option>
+                    </select>
+                    <select id="finance-category-filter" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                        <option value="all">Todas categorias</option>
+                    </select>
+                    <button id="reset-finance-filters" class="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">
+                        Limpar
+                    </button>
+                </div>
+                <div id="transaction-list" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Notes Tab Content -->
+        <div id="notes-content" class="tab-content hidden" role="tabpanel">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 dark:border dark:border-gray-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white">
+                        <i class="fas fa-sticky-note mr-2 text-purple-500"></i>Bloco de Notas
+                    </h2>
+                    <button id="add-note-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center">
+                        <i class="fas fa-plus mr-2"></i>Nova Nota
+                    </button>
+                </div>
+                <div id="note-form" class="hidden mb-6">
+                    <input type="text" id="note-title" placeholder="Título da nota" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                    <textarea id="note-content" placeholder="Escreva sua nota aqui..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg h-40 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                    <div class="mt-2 flex justify-end space-x-2">
+                        <button id="cancel-note-btn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Cancelar
+                        </button>
+                        <button id="save-note-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg">
+                            Salvar Nota
+                        </button>
+                    </div>
+                </div>
+                <div id="notes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // UTILITY FUNCTIONS
+        function formatCurrency(amount, currency = 'BRL') {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(amount);
+        }
+
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        // DATE AND TIME
+        function updateDateTime() {
+            const now = new Date();
+            const dateElement = document.getElementById('current-date');
+            const timeElement = document.getElementById('current-time');
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateElement.textContent = now.toLocaleDateString('pt-BR', options);
+            timeElement.textContent = now.toLocaleTimeString('pt-BR');
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // DARK MODE
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+
+        function toggleDarkMode(enable) {
+            document.documentElement.classList.toggle('dark', enable);
+            darkModeToggle.innerHTML = enable ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+            localStorage.setItem('darkMode', enable ? 'enabled' : 'disabled');
+        }
+
+        const savedMode = localStorage.getItem('darkMode');
+        if (savedMode === 'enabled' || (savedMode === null && prefersDarkScheme.matches)) {
+            toggleDarkMode(true);
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            toggleDarkMode(!document.documentElement.classList.contains('dark'));
+        });
+
+        // TAB NAVIGATION
+        document.querySelectorAll('.tab-button').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab-button').forEach(t => {
+                    t.classList.remove('active');
+                    t.classList.add('text-gray-500', 'dark:text-gray-400');
+                    t.setAttribute('aria-selected', 'false');
+                });
+                document.querySelectorAll('.tab-content').forEach(c => {
+                    c.classList.remove('active');
+                    c.classList.add('hidden');
+                });
+                this.classList.add('active');
+                this.classList.remove('text-gray-500', 'dark:text-gray-400');
+                this.setAttribute('aria-selected', 'true');
+                document.getElementById(`${this.dataset.tab}-content`).classList.remove('hidden');
+                document.getElementById(`${this.dataset.tab}-content`).classList.add('active');
+            });
+        });
+
+        // TASKS
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+        document.getElementById('add-task-btn').addEventListener('click', () => {
+            document.getElementById('task-form').classList.toggle('hidden');
+        });
+
+        document.getElementById('save-task-btn').addEventListener('click', () => {
+            const taskInput = document.getElementById('task-input');
+            const importantCheckbox = document.getElementById('important-checkbox');
+            const dueDateInput = document.getElementById('task-due-date');
+            if (!taskInput.value.trim()) return;
+            tasks.push({
+                id: Date.now(),
+                text: taskInput.value.trim(),
+                completed: false,
+                important: importantCheckbox.checked,
+                dueDate: dueDateInput.value || null,
+                createdAt: new Date().toISOString()
+            });
+            saveTasks();
+            renderTasks();
+            taskInput.value = '';
+            importantCheckbox.checked = false;
+            dueDateInput.value = '';
+            document.getElementById('task-form').classList.add('hidden');
+        });
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.remove('active', 'bg-blue-100', 'dark:bg-blue-900', 'text-blue-700', 'dark:text-blue-200');
+                    b.classList.add('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                });
+                btn.classList.add('active', 'bg-blue-100', 'dark:bg-blue-900', 'text-blue-700', 'dark:text-blue-200');
+                renderTasks(btn.dataset.filter);
+            });
+        });
+
+        function renderTasks(filter = 'all') {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            let filteredTasks = tasks.filter(task => {
+                if (filter === 'active') return !task.completed;
+                if (filter === 'completed') return task.completed;
+                if (filter === 'important') return task.important;
+                return true;
+            });
+
+            if (!filteredTasks.length) {
+                taskList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-inbox text-4xl mb-2"></i>
+                        <p>Nenhuma tarefa encontrada</p>
+                    </div>`;
+                return;
+            }
+
+            filteredTasks.sort((a, b) => {
+                if (a.important && !b.important) return -1;
+                if (!a.important && b.important) return 1;
+                if (a.dueDate && !b.dueDate) return -1;
+                if (!a.dueDate && b.dueDate) return 1;
+                if (a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+                return new Date(b.createdAt) - new Date(a.createdAt);
+            }).forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.className = `task-item bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 flex items-center justify-between ${task.completed ? 'opacity-70' : ''}`;
+                taskElement.dataset.id = task.id;
+
+                const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                let dueDateBadge = '';
+                if (dueDate) {
+                    const dueDateStr = dueDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+                    const isOverdue = dueDate < today && !task.completed;
+                    dueDateBadge = `
+                        <span class="text-xs px-2 py-1 rounded-full ${isOverdue ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'} ml-2">
+                            ${dueDateStr}${isOverdue ? ' (atrasada)' : ''}
+                        </span>`;
+                }
+
+                taskElement.innerHTML = `
+                    <div class="flex items-center">
+                        <input type="checkbox" ${task.completed ? 'checked' : ''} class="complete-checkbox form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-3 ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-200'}">
+                            ${task.text}
+                            ${task.important ? '<span class="text-red-500 ml-2"><i class="fas fa-exclamation-circle"></i></span>' : ''}
+                            ${dueDateBadge}
+                        </span>
+                    </div>
+                    <div class="task-actions opacity-0 flex space-x-2">
+                        <button class="edit-task p-1 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="delete-task p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>`;
+                taskList.appendChild(taskElement);
+            });
+
+            document.querySelectorAll('.complete-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const taskId = parseInt(this.closest('.task-item').dataset.id);
+                    const task = tasks.find(t => t.id === taskId);
+                    task.completed = this.checked;
+                    saveTasks();
+                    renderTasks(document.querySelector('.filter-btn.active').dataset.filter);
+                });
+            });
+
+            document.querySelectorAll('.delete-task').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const taskId = parseInt(this.closest('.task-item').dataset.id);
+                    tasks = tasks.filter(t => t.id !== taskId);
+                    saveTasks();
+                    renderTasks(document.querySelector('.filter-btn.active').dataset.filter);
+                });
+            });
+
+            document.querySelectorAll('.edit-task').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const taskId = parseInt(this.closest('.task-item').dataset.id);
+                    const task = tasks.find(t => t.id === taskId);
+                    document.getElementById('task-input').value = task.text;
+                    document.getElementById('important-checkbox').checked = task.important;
+                    document.getElementById('task-due-date').value = task.dueDate || '';
+                    document.getElementById('task-form').classList.remove('hidden');
+                    tasks = tasks.filter(t => t.id !== taskId);
+                    saveTasks();
+                    document.getElementById('task-input').focus();
+                });
+            });
+        }
+
+        function saveTasks() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        renderTasks();
+
+        // POMODORO
+        let pomodoroInterval;
+        let secondsLeft = 25 * 60;
+        let isPomodoroRunning = false;
+        let currentMode = 'work';
+        let pomodoroCount = 0;
+
+        function updatePomodoroDisplay() {
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = secondsLeft % 60;
+            document.getElementById('pomodoro-timer').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        document.getElementById('pomodoro-start').addEventListener('click', () => {
+            if (isPomodoroRunning) return;
+            isPomodoroRunning = true;
+            document.getElementById('pomodoro-start').classList.add('hidden');
+            document.getElementById('pomodoro-pause').classList.remove('hidden');
+            pomodoroInterval = setInterval(() => {
+                secondsLeft--;
+                updatePomodoroDisplay();
+                if (secondsLeft <= 0) {
+                    clearInterval(pomodoroInterval);
+                    pomodoroCount++;
+                    if (currentMode === 'work') {
+                        currentMode = pomodoroCount % 4 === 0 ? 'longBreak' : 'shortBreak';
+                        secondsLeft = (parseInt(document.getElementById(currentMode === 'shortBreak' ? 'short-break' : 'long-break').value) || (currentMode === 'shortBreak' ? 5 : 15)) * 60;
+                    } else {
+                        currentMode = 'work';
+                        secondsLeft = (parseInt(document.getElementById('work-duration').value) || 25) * 60;
+                    }
+                    isPomodoroRunning = false;
+                    document.getElementById('pomodoro-start').classList.remove('hidden');
+                    document.getElementById('pomodoro-pause').classList.add('hidden');
+                    updatePomodoroDisplay();
+                    alert(`Fim do ${currentMode === 'work' ? 'trabalho' : currentMode === 'shortBreak' ? 'pausa curta' : 'pausa longa'}! Inicie o próximo ciclo.`);
+                }
+            }, 1000);
+        });
+
+        document.getElementById('pomodoro-pause').addEventListener('click', () => {
+            if (!isPomodoroRunning) return;
+            isPomodoroRunning = false;
+            clearInterval(pomodoroInterval);
+            document.getElementById('pomodoro-start').classList.remove('hidden');
+            document.getElementById('pomodoro-pause').classList.add('hidden');
+        });
+
+        document.getElementById('pomodoro-reset').addEventListener('click', () => {
+            clearInterval(pomodoroInterval);
+            isPomodoroRunning = false;
+            currentMode = 'work';
+            pomodoroCount = 0;
+            secondsLeft = (parseInt(document.getElementById('work-duration').value) || 25) * 60;
+            updatePomodoroDisplay();
+            document.getElementById('pomodoro-start').classList.remove('hidden');
+            document.getElementById('pomodoro-pause').classList.add('hidden');
+        });
+
+        document.getElementById('save-settings').addEventListener('click', () => {
+            const workDuration = parseInt(document.getElementById('work-duration').value) || 25;
+            const shortBreak = parseInt(document.getElementById('short-break').value) || 5;
+            const longBreak = parseInt(document.getElementById('long-break').value) || 15;
+            if (currentMode === 'work') secondsLeft = workDuration * 60;
+            else if (currentMode === 'shortBreak') secondsLeft = shortBreak * 60;
+            else secondsLeft = longBreak * 60;
+            updatePomodoroDisplay();
+            alert('Configurações salvas!');
+        });
+
+        updatePomodoroDisplay();
+
+        // HABITS
+        let habits = JSON.parse(localStorage.getItem('habits')) || [];
+
+        document.getElementById('add-habit-btn').addEventListener('click', () => {
+            document.getElementById('habit-form').classList.toggle('hidden');
+        });
+
+        document.getElementById('save-habit-btn').addEventListener('click', () => {
+            const habitInput = document.getElementById('habit-input');
+            const habitDays = Array.from(document.querySelectorAll('input[name="habit-days"]:checked')).map(cb => parseInt(cb.value));
+            if (!habitInput.value.trim() || !habitDays.length) return;
+            habits.push({
+                id: Date.now(),
+                name: habitInput.value.trim(),
+                days: habitDays,
+                completions: [],
+                streak: 0
+            });
+            saveHabits();
+            renderHabits();
+            habitInput.value = '';
+            document.querySelectorAll('input[name="habit-days"]').forEach(cb => cb.checked = false);
+            document.getElementById('habit-form').classList.add('hidden');
+        });
+
+        function calculateStreak(completions) {
+            if (!completions.length) return 0;
+            const sorted = completions.sort((a, b) => new Date(b) - new Date(a));
+            let streak = 0;
+            let lastDate = new Date(sorted[0]);
+            lastDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (lastDate.getTime() === today.getTime()) streak++;
+            for (let i = 1; i < sorted.length; i++) {
+                const currentDate = new Date(sorted[i]);
+                currentDate.setHours(0, 0, 0, 0);
+                lastDate.setDate(lastDate.getDate() - 1);
+                if (currentDate.getTime() === lastDate.getTime()) streak++;
+                else break;
+            }
+            return streak;
+        }
+
+        function getWeeklyProgress() {
+            const today = new Date();
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            weekStart.setHours(0, 0, 0, 0);
+            let totalExpected = 0;
+            let totalCompleted = 0;
+            habits.forEach(habit => {
+                habit.days.forEach(day => {
+                    if (day >= weekStart.getDay() && day <= today.getDay()) totalExpected++;
+                });
+                habit.completions.forEach(comp => {
+                    const compDate = new Date(comp);
+                    if (compDate >= weekStart && compDate <= today) totalCompleted++;
+                });
+            });
+            return totalExpected ? Math.round((totalCompleted / totalExpected) * 100) : 0;
+        }
+
+        function renderHabits() {
+            const habitList = document.getElementById('habit-list');
+            habitList.innerHTML = '';
+            if (!habits.length) {
+                habitList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-calendar-times text-4xl mb-2"></i>
+                        <p>Nenhum hábito encontrado</p>
+                    </div>`;
+                document.getElementById('weekly-progress').style.width = '0%';
+                document.getElementById('progress-percentage').textContent = '0%';
+                return;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            habits.forEach(habit => {
+                const habitElement = document.createElement('div');
+                habitElement.className = 'habit-tracker bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4';
+                habitElement.dataset.id = habit.id;
+                const isTodayScheduled = habit.days.includes(today.getDay());
+                const isCompletedToday = habit.completions.some(comp => {
+                    const compDate = new Date(comp);
+                    compDate.setHours(0, 0, 0, 0);
+                    return compDate.getTime() === today.getTime();
+                });
+                habit.streak = calculateStreak(habit.completions);
+                habitElement.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <input type="checkbox" ${isCompletedToday ? 'checked' : ''} ${!isTodayScheduled ? 'disabled' : ''} class="complete-habit form-checkbox h-5 w-5 text-green-600 rounded">
+                            <span class="ml-3 text-gray-800 dark:text-gray-200">${habit.name}</span>
+                            <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">(${habit.days.map(d => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d]).join(', ')})</span>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-sm font-medium text-green-600 dark:text-green-400">Sequência: ${habit.streak}</span>
+                            <button class="delete-habit p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                habitList.appendChild(habitElement);
+            });
+
+            document.querySelectorAll('.complete-habit').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const habitId = parseInt(this.closest('.habit-tracker').dataset.id);
+                    const habit = habits.find(h => h.id === habitId);
+                    const today = new Date().toISOString().split('T')[0];
+                    if (this.checked) {
+                        if (!habit.completions.includes(today)) habit.completions.push(today);
+                    } else {
+                        habit.completions = habit.completions.filter(comp => comp !== today);
+                    }
+                    saveHabits();
+                    renderHabits();
+                });
+            });
+
+            document.querySelectorAll('.delete-habit').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const habitId = parseInt(this.closest('.habit-tracker').dataset.id);
+                    habits = habits.filter(h => h.id !== habitId);
+                    saveHabits();
+                    renderHabits();
+                });
+            });
+
+            const progress = getWeeklyProgress();
+            document.getElementById('weekly-progress').style.width = `${progress}%`;
+            document.getElementById('progress-percentage').textContent = `${progress}%`;
+        }
+
+        function saveHabits() {
+            localStorage.setItem('habits', JSON.stringify(habits));
+        }
+
+        renderHabits();
+
+        // FINANCE
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        const categories = {
+            income: ['Salário', 'Freelance', 'Investimentos', 'Outros'],
+            expense: ['Alimentação', 'Moradia', 'Transporte', 'Lazer', 'Saúde', 'Outros']
+        };
+
+        function populateCategories(type = 'income') {
+            const categorySelect = document.getElementById('transaction-category');
+            categorySelect.innerHTML = '';
+            categories[type].forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categorySelect.appendChild(option);
+            });
+        }
+
+        function populateCategoryFilter() {
+            const categoryFilter = document.getElementById('finance-category-filter');
+            categoryFilter.innerHTML = '<option value="all">Todas categorias</option>';
+            const allCategories = [...new Set([...categories.income, ...categories.expense])];
+            allCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categoryFilter.appendChild(option);
+            });
+        }
+
+        function populateMonthYearFilters() {
+            const monthSelect = document.getElementById('finance-month');
+            const yearSelect = document.getElementById('finance-year');
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            monthSelect.innerHTML = '';
+            yearSelect.innerHTML = '';
+            const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+            months.forEach((month, index) => {
+                const option = document.createElement('option');
+                option.value = index + 1;
+                option.textContent = month;
+                if (index + 1 === now.getMonth() + 1) option.selected = true;
+                monthSelect.appendChild(option);
+            });
+            for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === currentYear) option.selected = true;
+                yearSelect.appendChild(option);
+            }
+        }
+
+        document.getElementById('add-income-btn').addEventListener('click', () => {
+            document.getElementById('transaction-form').classList.remove('hidden');
+            document.getElementById('transaction-type').value = 'income';
+            populateCategories('income');
+            document.getElementById('transaction-date').value = new Date().toISOString().split('T')[0];
+        });
+
+        document.getElementById('add-expense-btn').addEventListener('click', () => {
+            document.getElementById('transaction-form').classList.remove('hidden');
+            document.getElementById('transaction-type').value = 'expense';
+            populateCategories('expense');
+            document.getElementById('transaction-date').value = new Date().toISOString().split('T')[0];
+        });
+
+        document.getElementById('cancel-transaction-btn').addEventListener('click', () => {
+            document.getElementById('transaction-form').classList.add('hidden');
+            document.getElementById('transaction-amount').value = '';
+            document.getElementById('transaction-description').value = '';
+        });
+
+        document.getElementById('save-transaction-btn').addEventListener('click', () => {
+            const type = document.getElementById('transaction-type').value;
+            const category = document.getElementById('transaction-category').value;
+            const amount = parseFloat(document.getElementById('transaction-amount').value);
+            const date = document.getElementById('transaction-date').value;
+            const description = document.getElementById('transaction-description').value.trim();
+            if (!amount || amount <= 0 || !date) return;
+            transactions.push({
+                id: Date.now(),
+                type,
+                category,
+                amount,
+                date,
+                description,
+                account: 'Conta Padrão'
+            });
+            saveTransactions();
+            renderTransactions();
+            document.getElementById('transaction-form').classList.add('hidden');
+            document.getElementById('transaction-amount').value = '';
+            document.getElementById('transaction-description').value = '';
+        });
+
+        document.getElementById('transaction-type').addEventListener('change', function() {
+            populateCategories(this.value);
+        });
+
+        document.getElementById('reset-finance-filters').addEventListener('click', () => {
+            const now = new Date();
+            document.getElementById('finance-month').value = now.getMonth() + 1;
+            document.getElementById('finance-year').value = now.getFullYear();
+            document.getElementById('finance-type-filter').value = 'all';
+            document.getElementById('finance-category-filter').value = 'all';
+            renderTransactions();
+        });
+
+        ['finance-month', 'finance-year', 'finance-type-filter', 'finance-category-filter'].forEach(id => {
+            document.getElementById(id).addEventListener('change', renderTransactions);
+        });
+
+        function renderTransactions() {
+            const transactionList = document.getElementById('transaction-list');
+            transactionList.innerHTML = '';
+            const month = parseInt(document.getElementById('finance-month').value);
+            const year = parseInt(document.getElementById('finance-year').value);
+            const typeFilter = document.getElementById('finance-type-filter').value;
+            const categoryFilter = document.getElementById('finance-category-filter').value;
+
+            let filteredTransactions = transactions.filter(t => {
+                const tDate = new Date(t.date);
+                return (
+                    tDate.getFullYear() === year &&
+                    tDate.getMonth() + 1 === month &&
+                    (typeFilter === 'all' || t.type === typeFilter) &&
+                    (categoryFilter === 'all' || t.category === categoryFilter)
+                );
+            });
+
+            let totalIncome = 0;
+            let totalExpense = 0;
+            filteredTransactions.forEach(t => {
+                if (t.type === 'income') totalIncome += t.amount;
+                else totalExpense += t.amount;
+            });
+
+            document.getElementById('total-income').textContent = formatCurrency(totalIncome);
+            document.getElementById('total-expense').textContent = formatCurrency(totalExpense);
+            document.getElementById('total-balance').textContent = formatCurrency(totalIncome - totalExpense);
+
+            if (!filteredTransactions.length) {
+                transactionList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-wallet text-4xl mb-2"></i>
+                        <p>Nenhuma transação encontrada</p>
+                    </div>`;
+                return;
+            }
+
+            filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(t => {
+                const transactionElement = document.createElement('div');
+                transactionElement.className = `transaction-item bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 flex justify-between items-center ${t.type === 'income' ? 'transaction-income' : 'transaction-expense'}`;
+                transactionElement.dataset.id = t.id;
+                transactionElement.innerHTML = `
+                    <div class="flex-1">
+                        <div class="flex items-center">
+                            <span class="font-medium text-gray-800 dark:text-gray-200">${t.description || t.category}</span>
+                            <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">${new Date(t.date).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        <div class="text-sm text-gray-600 dark:text-gray-300">${t.category} • ${t.account}</div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-lg font-semibold ${t.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
+                            ${t.type === 'income' ? '+' : '-'} ${formatCurrency(t.amount)}
+                        </span>
+                        <button class="delete-transaction p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>`;
+                transactionList.appendChild(transactionElement);
+            });
+
+            document.querySelectorAll('.delete-transaction').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const transactionId = parseInt(this.closest('.transaction-item').dataset.id);
+                    transactions = transactions.filter(t => t.id !== transactionId);
+                    saveTransactions();
+                    renderTransactions();
+                });
+            });
+        }
+
+        function saveTransactions() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+        }
+
+        populateCategories();
+        populateCategoryFilter();
+        populateMonthYearFilters();
+        renderTransactions();
+
+        // NOTES
+        let notes = JSON.parse(localStorage.getItem('notes')) || [];
+
+        document.getElementById('add-note-btn').addEventListener('click', () => {
+            document.getElementById('note-form').classList.remove('hidden');
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+        });
+
+        document.getElementById('cancel-note-btn').addEventListener('click', () => {
+            document.getElementById('note-form').classList.add('hidden');
+        });
+
+        document.getElementById('save-note-btn').addEventListener('click', () => {
+            const title = document.getElementById('note-title').value.trim();
+            const content = document.getElementById('note-content').value.trim();
+            if (!title && !content) return;
+            notes.push({
+                id: Date.now(),
+                title: title || 'Sem título',
+                content,
+                createdAt: new Date().toISOString()
+            });
+            saveNotes();
+            renderNotes();
+            document.getElementById('note-form').classList.add('hidden');
+            document.getElementById('note-title').value = '';
+            document.getElementById('note-content').value = '';
+        });
+
+        function renderNotes() {
+            const notesGrid = document.getElementById('notes-grid');
+            notesGrid.innerHTML = '';
+            if (!notes.length) {
+                notesGrid.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-sticky-note text-4xl mb-2"></i>
+                        <p>Nenhuma nota encontrada</p>
+                    </div>`;
+                return;
+            }
+
+            notes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).forEach(note => {
+                const noteElement = document.createElement('div');
+                noteElement.className = 'note bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4';
+                noteElement.dataset.id = note.id;
+                noteElement.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200">${note.title}</h3>
+                        <button class="delete-note p-1 text-gray-500 hover:text-red-500 dark:hover:text-red-400">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">${note.content || 'Sem conteúdo'}</p>
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                        Criado em: ${new Date(note.createdAt).toLocaleDateString('pt-BR')}
+                    </div>`;
+                notesGrid.appendChild(noteElement);
+            });
+
+            document.querySelectorAll('.delete-note').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const noteId = parseInt(this.closest('.note').dataset.id);
+                    notes = notes.filter(n => n.id !== noteId);
+                    saveNotes();
+                    renderNotes();
+                });
+            });
+        }
+
+        function saveNotes() {
+            localStorage.setItem('notes', JSON.stringify(notes));
+        }
+
+        renderNotes();
+    </script>
+</body>
+</html>
